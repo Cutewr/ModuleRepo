@@ -1,0 +1,10 @@
+in_chans: 3
+out_chans: 3
+window_size: 8
+embed_dims: [12, 48, 192, 48, 12]
+mlp_ratios: [2.0, 4.0, 4.0, 2.0, 2.0]
+depths: [16, 16, 16, 8, 8]
+num_heads: [2, 4, 6, 1, 1]
+attn_ratio: [0.25, 0.5, 0.75, 0, 0]
+conv_type: ["DWConv", "DWConv", "DWConv", "DWConv", "DWConv"]
+norm_layer: [RLN, RLN, RLN, RLN, RLN]
