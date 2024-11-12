@@ -1,6 +1,7 @@
 import math
 
 import torch
+import yaml
 from timm.models import trunc_normal_
 from torch import nn
 from torch.nn.init import _calculate_fan_in_and_fan_out
@@ -479,7 +480,12 @@ class IDWT(nn.Module):
 		x = self.rdwt((yl, yh))
 		return x
 
+# 对输入的特征进行某种形式的融合和加权处理，以生成经过调整的输出特征。
+# 可能用于处理多组具有相同空间维度但不同通道数的特征图，并根据这些特征图的整体信息来重新分配权重，从而生成综合的输出特征。
 class CIFM(nn.Module):
+	# dim：可能表示输入特征的通道数维度相关的参数，用于后续计算中间层的维度等。
+	# height：默认值为2，与将输入特征划分为几个部分或者某种层次结构相关，用于在特定维度上进行操作。
+	# reduction：默认值为8，用于在计算中间层维度时对dim进行缩减操作，以控制模型的复杂度。
 	def __init__(self, dim, height=2, reduction=8):
 		super(CIFM, self).__init__()
 
@@ -492,13 +498,13 @@ class CIFM(nn.Module):
 			nn.ReLU(),
 			nn.Conv2d(d, dim*height, 1, bias=False)
 		)
-
+		# 在dim=1维度进行softmax
 		self.softmax = nn.Softmax(dim=1)
 
 	def forward(self, in_feats):
 		#print(in_feats[0].shape, in_feats[1].shape)
 		B, C, H, W = in_feats[0].shape
-
+		# 将输入的多个特征图沿通道维度进行拼接，使它们合并成一个具有更多通道数的特征图
 		in_feats = torch.cat(in_feats, dim=1)
 		in_feats = in_feats.view(B, self.height, C, H, W)
 
@@ -543,3 +549,38 @@ class RLN(nn.Module):
 
         out = normalized_input * self.weight + self.bias
         return out, rescale, rebias
+
+def load_config(config_file):
+    """加载配置文件"""
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)
+    return config
+
+
+def main():
+    # 加载配置文件
+    config = load_config('config.yaml')
+
+    # 初始化模型
+    model = DustFormer(
+        in_chans=config['in_chans'],
+        out_chans=config['out_chans'],
+        window_size=config['window_size'],
+        embed_dims=config['embed_dims'],
+        mlp_ratios=config['mlp_ratios'],
+        depths=config['depths'],
+        num_heads=config['num_heads'],
+        attn_ratio=config['attn_ratio'],
+        conv_type=config['conv_type'],
+        norm_layer=[RLN for _ in config['norm_layer']]
+    )
+
+    # 测试数据
+    x = torch.randn(1, 3, 256, 256)  # 假设输入图像尺寸为256x256，3个通道
+    output = model(x)
+
+    print(f"输入维度: {x.shape}")
+    print(f"输出维度: {output.shape}")
+
+if __name__ == "__main__":
+    main()
