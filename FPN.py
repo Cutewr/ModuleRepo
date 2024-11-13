@@ -58,8 +58,7 @@ class FPN(nn.Module):
 
         # Top layer
         # 金字塔顶端层
-        # 通过一个1*1的卷积将2048输入通道转换为256输出通道
-        # 降低通道数，以便后续与其他层进行融合处理
+        # 通过一个1*1的卷积将2048输入通道转换为256输出通道。降低通道数，以便后续与其他层进行融合处理
         self.toplayer = nn.Conv2d(2048, 256, kernel_size=1, stride=1, padding=0)  # Reduce channels
 
         # Smooth layers
@@ -117,19 +116,24 @@ class FPN(nn.Module):
         # _:是占位符，我们不关心y的前两个维度
         # 只关注高度和宽度
         _,_,H,W = y.size()
-        # 使用双线性插值对x进行上采样，使得
+        # 使用双线性插值对x进行上采样，使得x尺寸调整为何y一样的(H,W) 再和y相加
         return F.upsample(x, size=(H,W), mode='bilinear') + y
 
     def forward(self, x):
-        # Bottom-up
+        # Bottom-up 自底向上
         c1 = F.relu(self.bn1(self.conv1(x)))
+        # 最大池化：提取数据的主要特征，减少计算量
         c1 = F.max_pool2d(c1, kernel_size=3, stride=2, padding=1)
+        # 得到不同层次的特征图：越往上，语义信息越丰富，位置信息越不明确
         c2 = self.layer1(c1)
         c3 = self.layer2(c2)
         c4 = self.layer3(c3)
         c5 = self.layer4(c4)
-        # Top-down
+        # Top-down 自顶向下
+        # 将c5通过toplayer降低通道数为256，得到金字塔顶端特征图p5
         p5 = self.toplayer(c5)
+        # latlayer：将中间层的通道数转换为256
+        # _upsample_add:调整顶端大小，和中间层相加
         p4 = self._upsample_add(p5, self.latlayer1(c4))
         p3 = self._upsample_add(p4, self.latlayer2(c3))
         p2 = self._upsample_add(p3, self.latlayer3(c2))
